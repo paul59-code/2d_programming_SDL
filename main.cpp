@@ -3,8 +3,41 @@
 #include <glm/glm.hpp>
 #include "SDL3/SDL_render.h"
 #include <iostream>
-
+#include "Box.cpp"
+#include <vector>
+#define vy_rects 30
+#define RECTS_SIZE 40
+#define D 10
     using namespace std;
+
+void genereazaCerc(SDL_Renderer* renderer, float centruX, float centruY, float raza) {
+    int diametru = (raza * 2);
+    int x = (raza - 1);
+    int y = 0;
+    int tx = 1;
+    int ty = 1;
+    int eroare = (tx - diametru);
+    while (x >= y) {
+        SDL_RenderPoint(renderer, centruX + x, centruY - y);
+        SDL_RenderPoint(renderer, centruX + x, centruY + y);
+        SDL_RenderPoint(renderer, centruX - x, centruY - y);
+        SDL_RenderPoint(renderer, centruX - x, centruY + y);
+        SDL_RenderPoint(renderer, centruX + y, centruY - x);
+        SDL_RenderPoint(renderer, centruX + y, centruY + x);
+        SDL_RenderPoint(renderer, centruX - y, centruY - x);
+        SDL_RenderPoint(renderer, centruX - y, centruY + x);
+        if (eroare <= 0) {
+            ++y;
+            eroare += ty;
+            ty += 2;
+        }
+        if (eroare > 0) {
+            --x;
+            tx += 2;
+            eroare += tx - diametru;
+        }
+    }
+}
 
 class obiectGeneral {
 protected:
@@ -45,12 +78,12 @@ public:
 };
 
 
-class PlayerShip : public obiectGeneral {
+class PatratPlayer : public obiectGeneral {
 private:
     SDL_Color color; // verde
 
 public:
-    PlayerShip(glm::vec2 startPos)
+    PatratPlayer(glm::vec2 startPos)
         : obiectGeneral(startPos, 50.0f, 50.0f), color({0, 255, 0, 255}) {}
 
     void update(float deltaTime) override {
@@ -66,16 +99,29 @@ public:
     void setColor(SDL_Color newColor) { color = newColor; }
 
     void handleInput(float mouseRelX, float mouseRelY) {
-        // accelerare in functie de miscarea mouse ului
+        pozitie.x += mouseRelX;
+        pozitie.y += mouseRelY;
+        if (pozitie.x < latime / 2.0f) {
+            pozitie.x = latime / 2.0f;
+        }
+        if (pozitie.x > 700.0f - latime / 2.0f) {
+            pozitie.x = 700.0f - latime / 2.0f;
+        }
+        if (pozitie.y < inaltime / 2.0f) {
+            pozitie.y = inaltime / 2.0f;
+        }
+        if (pozitie.y > 800.0f - inaltime / 2.0f) {
+            pozitie.y = 800.0f - inaltime / 2.0f;
+        }
     }
 };
 
-class Enemy : public obiectGeneral {
+class PatratTarget : public obiectGeneral {
 private:
     float fireTimer; // cqnd tinta trebuie sa traga cu bile
 
 public:
-    Enemy(glm::vec2 startPos, float initialSpeed)
+    PatratTarget(glm::vec2 startPos, float initialSpeed)
         : obiectGeneral(startPos, 50.0f, 50.0f), fireTimer(0.0f) {
         viteza.y = initialSpeed;
     }
@@ -93,13 +139,13 @@ public:
     }
 };
 
-class Projectile : public obiectGeneral {
+class Proiectil : public obiectGeneral {
 private:
     SDL_Color color;
     float radius;
 
 public:
-    Projectile(glm::vec2 startPos, glm::vec2 dirVelocity, SDL_Color projColor)
+    Proiectil(glm::vec2 startPos, glm::vec2 dirVelocity, SDL_Color projColor)
         : obiectGeneral(startPos, 20.0f, 20.0f), color(projColor), radius(10.0f) {
         viteza = dirVelocity;
     }
@@ -112,12 +158,12 @@ public:
         // desenez cerc folosind functii geometrice
         // creez fill circle
         SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        DrawCircle(renderer, pozitie.x, pozitie.y, radius);
+        genereazaCerc(renderer, pozitie.x, pozitie.y, radius);
     }
 };
 
-constexpr int WINDOW_WIDTH{640};
-constexpr int WINDOW_HEIGHT{480};
+constexpr int WINDOW_WIDTH{700};
+constexpr int WINDOW_HEIGHT{800};
 
 SDL_Window *window{nullptr};
 SDL_Renderer *renderer{nullptr};
@@ -129,6 +175,8 @@ bool quit{false};
 float mouseX{-1.0f}, mouseY{-1.0f};
 
 float displayScale{1.0f};
+
+
 
 bool initWindow() {
     bool success{true};
@@ -169,16 +217,12 @@ void processEvents() {
                 mouseY /= displayScale;
             }
         }
+
         if (currentEvent.type == SDL_EVENT_MOUSE_MOTION) {
-            if (const SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(nullptr, nullptr); mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) {
-                SDL_GetMouseState(&mouseX, &mouseY);
-                mouseX /= displayScale;
-                mouseY /= displayScale;
-            }
+            float relX = currentEvent.motion.xrel;
+            float relY = currentEvent.motion.yrel;
+           // PatratPlayer.handleInput(relX, relY);
         }
-
-        // ce se intampla cand ne jucam din sageti - suplimentar
-
     }
 }
 
@@ -212,20 +256,52 @@ void cleanup() {
 }
 
 int main() {
-    //Initialize window
+    Box rects[RECTS_SIZE];
+    int i;
+    for (i=0;i<RECTS_SIZE/2;i++) {
+        rects[i].setVX(0);
+        rects[i].setVY(vy_rects);
+        rects[i].x=0;
+        rects[i].y=i*D;
+        rects[i+20].y=i*D;
+        rects[i+20].setVX(0);
+        rects[i+20].setVY(vy_rects);
+        rects[i+20].x=WINDOW_WIDTH;
+    }
+
+
     if (!initWindow()) {
         std::cout << "Failed to initialize" << std::endl;
         return -1;
     }
-
     SDL_zero(currentEvent);
+    glm::vec2 playerStartPos(350.0f, 800.0f - 25.0f);
+    PatratPlayer player(playerStartPos);
+    std::vector<PatratTarget> enemies;
+    enemies.push_back(PatratTarget(glm::vec2(116.0f, 100.0f), 0.0f));
+    enemies.push_back(PatratTarget(glm::vec2(350.0f, 200.0f), 0.0f));
+    enemies.push_back(PatratTarget(glm::vec2(583.0f, 150.0f), 0.0f));
 
-    //Game loop
+
+    int lastTime = SDL_GetTicks();
+    SDL_SetWindowRelativeMouseMode(window, true);
     while (!quit) {
+        int currentTime = SDL_GetTicks();
+        float deltaTime = (currentTime - lastTime) / 1000.0f;
+        lastTime = currentTime;
         processEvents();
-        drawFrame();
+        player.update(deltaTime);
+        for (auto& enemy : enemies) {
+            enemy.update(deltaTime);
+        }
+        SDL_SetRenderDrawColor(renderer, backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
+        SDL_RenderClear(renderer);
+        player.render(renderer);
+        for (auto& enemy : enemies) {
+            enemy.render(renderer);
+        }
+        SDL_RenderPresent(renderer);
     }
-
     cleanup();
     return 0;
 }
