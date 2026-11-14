@@ -10,3 +10,5 @@ add_subdirectory(vendored/SDL)
 add_executable(proba_2d_programming main.cpp)
 
 target_link_libraries(proba_2d_programming PRIVATE SDL3::SDL3)
+
+include_directories(${CMAKE_SOURCE_DIR})
